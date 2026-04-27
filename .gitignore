@@ -4,3 +4,4 @@ Cargo.lock
 examples/
 lib/
 model_data/
+scripts/__pycache__
