@@ -2,9 +2,6 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum BirdError {
-    #[error("Classifier error: {0}")]
-    Classifier(#[from] birdnet_onnx::Error),
-
     #[error("Microphone error: {0}")]
     Microphone(String),
 

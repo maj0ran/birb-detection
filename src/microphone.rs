@@ -70,9 +70,10 @@ impl BirdMicrophone {
         let rb = HeapRb::<f32>::new(RING_BUFFER_SIZE);
         let (mut producer, consumer) = rb.split();
 
-        // initializes a thread that will periodically read from the microphone.
-        // the `data_callback` is called every time the `data` buffer with the given size is filled.
-        // we will then push this data into our ringbuffer where it will be accessible from the outside.
+        // Initializes a thread that will periodically read from the microphone.
+        // The `data_callback` is called every time the `data` buffer with the given size is filled.
+        // (This functionality is CPAL foo, so we have to work with it this way.)
+        // We will then push this data into our ringbuffer where it will be accessible from the outside.
         let _stream = input.build_input_stream(
             &config,
             move |data: &[f32], _: &InputCallbackInfo| {
