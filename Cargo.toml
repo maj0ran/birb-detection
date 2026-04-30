@@ -1,25 +1,7 @@
-[package]
-name = "bird-detection"
-version = "0.1.0"
-edition = "2024"
+[workspace]
+members = [ 
+    "station",
+    "display",
+]
 
-[dependencies]
-# Audio
-cpal = "0.17.3"
-# Ringbuffer
-ringbuf = "0.4"
-
-# async runtime
-smol = "2.0.2"
-smol-macros = "0.1.1"
-
-# logging
-env_logger = "0.11.10"
-log = "0.4.29"
-# byte order conversion
-byteorder = "1.5.0"
-# macros for better error handling
-thiserror = "2"
-# processing encyclopedia data
-image = "0.25.10"
-base64 = "0.22.1"
+resolver="3"
