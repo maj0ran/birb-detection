@@ -6,13 +6,13 @@ from PIL import Image
 from config import encyclopedia_dir, root_dir
 
 
-def resize_image(image_path, size=(800, 800)):
+def resize_image(image_path, size=(600, 600)):
     if not image_path.exists():
         return
 
     try:
         with Image.open(image_path) as img:
-            # Resample Image in-place to 800px
+            # Resample Image in-place to 600px
             img.thumbnail(size, Image.Resampling.LANCZOS)
             img.save(image_path, "JPEG")
             print(f"Resized image of {image_path.parent.name} to {img.size}")
@@ -31,51 +31,10 @@ def get_translations(labels_file):
     return translations
 
 
-def generate_html(bird_name, translation, description, image_path):
-    description_html = description.replace("\n", "<br>")
-
-    image_html = ""
-    if image_path.exists():
-        with open(image_path, "rb") as img_file:
-            b64_data = base64.b64encode(img_file.read()).decode("utf-8")
-            image_html = f'<img src="data:image/jpeg;base64,{
-                b64_data
-            }" style="float: right; width: 40%; margin-left: 20px; margin-bottom: 20px;" alt="{
-                bird_name
-            }">'
-
-    html = f"""<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>{bird_name}</title>
-    <style>
-        body {{
-            font-family: sans-serif;
-            line-height: 1.6;
-            margin: 40px;
-        }}
-        h1 {{
-            text-align: center;
-        }}
-        h2 {{
-            text-align: center;
-        }}
-        .container {{
-            overflow: auto;
-        }}
-    </style>
-</head>
-<body>
-    <h1>{bird_name}</h1>
-    <h2>({translation})</h2>
-    <div class="container">
-        {image_html}
-        <p>{description_html}</p>
-    </div>
-</body>
-</html>"""
-    return html
+def generate_description(bird_name, translation, description):
+    desc = f"{bird_name}\n{translation}\n{description}"
+    return desc
+        
 
 
 def main():
@@ -86,7 +45,7 @@ def main():
     args = parser.parse_args()
 
     base_dir = Path(encyclopedia_dir)
-    labels_de_file = Path(root_dir) / "model_data" / "labels_de.txt"
+    labels_de_file = Path(root_dir) / "scripts" / "labels_de.txt"
     translations = get_translations(labels_de_file)
 
     if not base_dir.exists():
@@ -99,12 +58,11 @@ def main():
             image_file = bird_dir / "image.jpg"
             resize_image(image_file)
 
-    # -- Generate HTML pages next -- #
+    # -- Generate description text -- #
     for bird_dir in base_dir.iterdir():
         bird_name = bird_dir.name
         description_file = bird_dir / "description.txt"
-        image_file = bird_dir / "image.jpg"
-        output_file = bird_dir / "index.html"
+        output_file = bird_dir / "desc.txt"
 
         translation = translations.get(bird_name, bird_name)
 
@@ -123,26 +81,29 @@ def main():
                 if idx != -1:
                     description = description[:idx]
 
-        html_content = generate_html(
-            bird_name, translation, description, image_file)
+        desc = generate_description(
+            bird_name, translation, description)
 
-        with open(output_file, "w", encoding="utf-8") as f:
-            f.write(html_content)
+        try:
+            with open(output_file, "w", encoding="utf-8") as f:
+                f.write(desc)
+        except:
+            pass
 
         print(f"Generated {output_file}")
 
     # -- Remove old files -- #
-    for bird_dir in base_dir.iterdir():
-        description_file = bird_dir / "description.txt"
-        image_file = bird_dir / "image.jpg"
-        try:
-            os.remove(description_file)
-        except Exception:
-            pass
-        try:
-            os.remove(image_file)
-        except Exception:
-            pass
+        #    for bird_dir in base_dir.iterdir():
+        #        description_file = bird_dir / "description.txt"
+        #        image_file = bird_dir / "image.jpg"
+        #        try:
+        #            os.remove(description_file)
+        #        except Exception:
+        #            pass
+        #        try:
+        #            os.remove(image_file)
+        #        except Exception:
+        #            pass
 
 
 if __name__ == "__main__":
