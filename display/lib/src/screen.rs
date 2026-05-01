@@ -6,8 +6,10 @@ use crate::framebuffer::{self, Framebuffer, MxcfbRect};
 use crate::math::{UVec, Vec2};
 use crate::page::Page;
 use crate::util::Color;
-
-/* Abstraction over the framebuffer for our eink usecase */
+///
+/// Abstraction over the framebuffer for our eink usecase.
+/// This represents the E-Ink screen by wrapping the framebuffer and exposing
+/// width and height.
 pub struct Screen {
     pub(crate) fb: Rc<RefCell<Framebuffer>>,
     pub width: u16,
@@ -16,6 +18,9 @@ pub struct Screen {
 }
 
 impl Screen {
+    ///
+    /// Constructor. Wraps /dev/fb0.
+    ///
     pub fn new() -> Result<Screen> {
         let fb = Framebuffer::new("/dev/fb0");
         let fb = match fb {
@@ -53,7 +58,9 @@ impl Screen {
             }
         }
     }
-
+    ///
+    /// Plot a single pixel on the screen.
+    ///
     pub fn plot(&self, px: UVec, color: Color) -> Result<()> {
         if px.x > self.width || px.y > self.height {
             return Err(EInkError::Plot());
@@ -64,6 +71,9 @@ impl Screen {
         Ok(())
     }
 
+    ///
+    /// Clear the Framebuffer with white pixels.
+    ///
     pub fn clear(&self) {
         let mut fb = self.fb.borrow_mut();
         for x in 0..self.width {
@@ -72,9 +82,9 @@ impl Screen {
             }
         }
     }
-    /* updates the screen with all previous drawing calls.
-     * blocks until screen is updated.
-     */
+    /// Updates the screen with all previous drawing calls.
+    /// Blocks until screen is updated.
+    ///
     pub fn update(&self) {
         let mut fb = self.fb.borrow_mut();
         let rect = MxcfbRect {

@@ -2,6 +2,9 @@ use crate::screen::Screen;
 use crate::util::Color;
 use crate::widgets::widget::Widget;
 
+///
+/// A single page that can be rendered on the screen. A page is a collection of widgets.
+///
 pub struct Page {
     pub width: u16,
     pub height: u16,
@@ -10,6 +13,9 @@ pub struct Page {
 }
 
 impl Page {
+    ///
+    /// get a new Page that has the dimensions of the screen object.
+    ///
     pub fn new_with_screen_dim(screen: &Screen) -> Page {
         let width = screen.width;
         let height = screen.height;
@@ -25,9 +31,9 @@ impl Page {
     pub fn add(&mut self, obj: Box<dyn Widget>) {
         self.widgets.push(obj);
     }
-    /*
-     * take all widgets and composite them into a single buffer with the size of a page
-     */
+    ///
+    /// take all widgets and composite them into a single buffer with the size of a page
+    ///
     pub fn composite(&mut self) -> &Vec<Color> {
         let buf = &mut self.buffer;
         for widget in &mut self.widgets {

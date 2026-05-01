@@ -4,9 +4,9 @@ use std::path::Path;
 
 use super::widget::{Position, Widget};
 
-/***
- * GUI-Element that shows an Image on the E-Ink Display
- ***/
+///
+/// GUI-Element to show an Image on the E-Ink Display.
+///
 #[derive(Debug)]
 pub struct Image {
     pos: UVec,

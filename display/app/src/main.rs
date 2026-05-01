@@ -74,8 +74,8 @@ pub fn main() -> Result<()> {
         FONT_SMALLMED,
         Position::Relative(&Positioner {
             rel: latin_name_item.as_ref(),
-            anchor: (HAlign::Left, VAlign::Down),
-            align: (HAlign::Right, VAlign::Down),
+            anchor: (HAlign::Left, VAlign::Bottom),
+            align: (HAlign::Right, VAlign::Bottom),
             margin: (0, 48),
         }),
         Vec2::new(700, 200),

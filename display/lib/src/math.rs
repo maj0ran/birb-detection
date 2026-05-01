@@ -1,3 +1,6 @@
+/// Just some primitive linear algebra that is good to have when working on a 2D matrix
+/// like those displays usually are.
+
 #[derive(Debug, Copy, Clone)]
 pub struct Vec2<T> {
     pub x: T,
@@ -198,6 +201,7 @@ where
     }
 }
 
+/// Map our `Vec2` to `rusttype::Point`
 impl From<Vec2<f32>> for rusttype::Point<f32> {
     fn from(value: Vec2<f32>) -> Self {
         rusttype::Point {

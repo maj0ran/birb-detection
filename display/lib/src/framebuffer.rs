@@ -10,10 +10,167 @@ use std::{
     ptr,
 };
 
+/// Low-Level file to talk to the framebuffer device driver.
+/// This file implements all the ioctls and structs that are needed to initialize the framebuffer.
+/// You can look up the driver in the kobolab git repository.
+
+/// The framebuffer object we get after all driver dance is completed.
+pub struct Framebuffer {
+    device: File,
+    frame: *mut libc::c_void,
+    frame_size: libc::size_t,
+    token: u32,
+    flags: u32,
+    pub bytes_per_pixel: u8,
+    pub var_info: VarScreenInfo,
+    pub fix_info: FixScreenInfo,
+}
+
+impl Framebuffer {
+    /// Create a new Framebuffer from the given framebuffer device.
+    /// This call will send the appropriate ioctl to query device properties like screen size.
+    /// It will then create a memory map for the memory buffer where we can effectively
+    /// set our pixels.
+    pub fn new<P: AsRef<Path>>(path: P) -> io::Result<Framebuffer> {
+        let device = OpenOptions::new().read(true).write(true).open(path)?;
+
+        // ioctl calls
+        let var_info = var_screen_info(&device)?;
+        let fix_info = fix_screen_info(&device)?;
+
+        assert_eq!(var_info.bits_per_pixel % 8, 0);
+
+        let bytes_per_pixel = var_info.bits_per_pixel / 8;
+
+        let mut frame_size =
+            (var_info.xres_virtual * var_info.yres_virtual * bytes_per_pixel) as libc::size_t;
+
+        if frame_size > fix_info.smem_len as usize {
+            frame_size = fix_info.smem_len as usize;
+        }
+
+        assert!(frame_size as u32 >= var_info.yres * fix_info.line_length);
+
+        // map framebuffer memory
+        let frame = unsafe {
+            libc::mmap(
+                ptr::null_mut(),
+                frame_size,
+                libc::PROT_READ | libc::PROT_WRITE,
+                libc::MAP_SHARED,
+                device.as_raw_fd(),
+                0,
+            )
+        };
+
+        if frame == libc::MAP_FAILED {
+            Err(io::Error::last_os_error())
+        } else {
+            Ok(Framebuffer {
+                device,
+                frame,
+                frame_size,
+                token: 1,
+                flags: 0,
+                bytes_per_pixel: bytes_per_pixel as u8,
+                var_info,
+                fix_info,
+            })
+        }
+    }
+
+    ///
+    /// Write RGB-Value into a single pixel.
+    ///
+    pub fn set_pixel(&mut self, p: UVec, rgb: [u8; 3]) {
+        let addr = (self.var_info.xoffset as isize + p.x as isize)
+            * (self.bytes_per_pixel as isize)
+            + (self.var_info.yoffset as isize + p.y as isize)
+                * (self.fix_info.line_length as isize);
+
+        assert!(addr < self.frame_size as isize);
+
+        unsafe {
+            let pixel = self.frame.offset(addr) as *mut u8;
+            *pixel.offset(2) = rgb[0];
+            *pixel.offset(1) = rgb[1];
+            *pixel.offset(0) = rgb[2];
+            *pixel.offset(3) = 0;
+        }
+    }
+    ///
+    /// Call the `Update` ioctl on the framebuffer.
+    /// This tells the Display to update its content with the current framebuffer.
+    pub fn update<T: Into<MxcfbRect>>(&mut self, rect: T, mode: Mode) -> io::Result<u32> {
+        let (update_mode, waveform_mode) = match mode {
+            Mode::Fast => (UpdateMode::Partial, WaveformMode::A2),
+            Mode::Partial => (UpdateMode::Partial, WaveformMode::Auto),
+            Mode::Gui => (UpdateMode::Full, WaveformMode::Auto),
+            Mode::Full => (UpdateMode::Full, WaveformMode::Gc16),
+        };
+        let alt_buffer_data = MxcfbAltBufferData {
+            virt_addr: ptr::null(),
+            phys_addr: 0,
+            width: 0,
+            height: 0,
+            alt_update_region: MxcfbRect {
+                top: 0,
+                left: 0,
+                width: 0,
+                height: 0,
+            },
+        };
+
+        let update_marker = self.token;
+        let update_data = MxcfbUpdateData {
+            update_region: rect.into(),
+            waveform_mode: waveform_mode as u32,
+            update_mode: update_mode as u32,
+            update_marker,
+            temp: TEMP_USE_AMBIENT,
+            flags: self.flags,
+            alt_buffer_data,
+        };
+        let result =
+            unsafe { libc::ioctl(self.device.as_raw_fd(), MXCFB_SEND_UPDATE, &update_data) };
+        match result {
+            -1 => Err(io::Error::last_os_error()),
+            _ => {
+                self.token = self.token.wrapping_add(1);
+                Ok(update_marker)
+            }
+        }
+    }
+
+    pub fn wait(&mut self) -> io::Result<i32> {
+        // ??? token reqauired for ioctl, usage unclear
+        let token = 1;
+        let result = unsafe {
+            libc::ioctl(
+                self.device.as_raw_fd(),
+                MXCFB_WAIT_FOR_UPDATE_COMPLETE,
+                &token,
+            )
+        };
+        match result {
+            -1 => Err(io::Error::last_os_error()),
+            _ => Ok(result as i32),
+        }
+    }
+}
+
+/**
+ ** The following stuff is all the helper functions and structs to initialize the framebuffer.
+ ** Most of it is pretty self-explanatory, and we don't really use a lot of this stuff, but we need
+ ** it to correctly talk with the driver and fill all the fields we get from the kernel.
+ **/
+
 const FBIOGET_VSCREENINFO: libc::c_ulong = 0x4600;
 const FBIOGET_FSCREENINFO: libc::c_ulong = 0x4602;
 
-// all waveform modes for documentation even though we don't use them
+///
+/// All waveform modes for documentation even though we don't use them.
+///
 #[allow(unused)]
 enum WaveformMode {
     Init = 0,
@@ -164,17 +321,6 @@ impl ::std::default::Default for VarScreenInfo {
     }
 }
 
-pub struct Framebuffer {
-    device: File,
-    frame: *mut libc::c_void,
-    frame_size: libc::size_t,
-    token: u32,
-    flags: u32,
-    pub bytes_per_pixel: u8,
-    pub var_info: VarScreenInfo,
-    pub fix_info: FixScreenInfo,
-}
-
 pub fn fix_screen_info(device: &File) -> io::Result<FixScreenInfo> {
     let mut info: FixScreenInfo = Default::default();
     let result = unsafe { ioctl(device.as_raw_fd(), FBIOGET_FSCREENINFO, &mut info) };
@@ -190,127 +336,5 @@ pub fn var_screen_info(device: &File) -> io::Result<VarScreenInfo> {
     match result {
         -1 => Err(io::Error::last_os_error()),
         _ => Ok(info),
-    }
-}
-
-impl Framebuffer {
-    pub fn new<P: AsRef<Path>>(path: P) -> io::Result<Framebuffer> {
-        let device = OpenOptions::new().read(true).write(true).open(path)?;
-
-        let var_info = var_screen_info(&device)?;
-        let fix_info = fix_screen_info(&device)?;
-
-        assert_eq!(var_info.bits_per_pixel % 8, 0);
-
-        let bytes_per_pixel = var_info.bits_per_pixel / 8;
-
-        let mut frame_size =
-            (var_info.xres_virtual * var_info.yres_virtual * bytes_per_pixel) as libc::size_t;
-
-        if frame_size > fix_info.smem_len as usize {
-            frame_size = fix_info.smem_len as usize;
-        }
-
-        assert!(frame_size as u32 >= var_info.yres * fix_info.line_length);
-
-        let frame = unsafe {
-            libc::mmap(
-                ptr::null_mut(),
-                frame_size,
-                libc::PROT_READ | libc::PROT_WRITE,
-                libc::MAP_SHARED,
-                device.as_raw_fd(),
-                0,
-            )
-        };
-
-        if frame == libc::MAP_FAILED {
-            Err(io::Error::last_os_error())
-        } else {
-            Ok(Framebuffer {
-                device,
-                frame,
-                frame_size,
-                token: 1,
-                flags: 0,
-                bytes_per_pixel: bytes_per_pixel as u8,
-                var_info,
-                fix_info,
-            })
-        }
-    }
-
-    pub fn set_pixel(&mut self, p: UVec, rgb: [u8; 3]) {
-        let addr = (self.var_info.xoffset as isize + p.x as isize)
-            * (self.bytes_per_pixel as isize)
-            + (self.var_info.yoffset as isize + p.y as isize)
-                * (self.fix_info.line_length as isize);
-
-        assert!(addr < self.frame_size as isize);
-
-        unsafe {
-            let pixel = self.frame.offset(addr) as *mut u8;
-            *pixel.offset(2) = rgb[0];
-            *pixel.offset(1) = rgb[1];
-            *pixel.offset(0) = rgb[2];
-            *pixel.offset(3) = 0;
-        }
-    }
-
-    pub fn update<T: Into<MxcfbRect>>(&mut self, rect: T, mode: Mode) -> io::Result<u32> {
-        let (update_mode, waveform_mode) = match mode {
-            Mode::Fast => (UpdateMode::Partial, WaveformMode::A2),
-            Mode::Partial => (UpdateMode::Partial, WaveformMode::Auto),
-            Mode::Gui => (UpdateMode::Full, WaveformMode::Auto),
-            Mode::Full => (UpdateMode::Full, WaveformMode::Gc16),
-        };
-        let alt_buffer_data = MxcfbAltBufferData {
-            virt_addr: ptr::null(),
-            phys_addr: 0,
-            width: 0,
-            height: 0,
-            alt_update_region: MxcfbRect {
-                top: 0,
-                left: 0,
-                width: 0,
-                height: 0,
-            },
-        };
-
-        let update_marker = self.token;
-        let update_data = MxcfbUpdateData {
-            update_region: rect.into(),
-            waveform_mode: waveform_mode as u32,
-            update_mode: update_mode as u32,
-            update_marker,
-            temp: TEMP_USE_AMBIENT,
-            flags: self.flags,
-            alt_buffer_data,
-        };
-        let result =
-            unsafe { libc::ioctl(self.device.as_raw_fd(), MXCFB_SEND_UPDATE, &update_data) };
-        match result {
-            -1 => Err(io::Error::last_os_error()),
-            _ => {
-                self.token = self.token.wrapping_add(1);
-                Ok(update_marker)
-            }
-        }
-    }
-
-    pub fn wait(&mut self) -> io::Result<i32> {
-        // ??? token reqauired for ioctl, usage unclear
-        let token = 1;
-        let result = unsafe {
-            libc::ioctl(
-                self.device.as_raw_fd(),
-                MXCFB_WAIT_FOR_UPDATE_COMPLETE,
-                &token,
-            )
-        };
-        match result {
-            -1 => Err(io::Error::last_os_error()),
-            _ => Ok(result as i32),
-        }
     }
 }
