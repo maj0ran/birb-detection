@@ -1,7 +1,8 @@
 [workspace]
-members = [ 
+members = [
     "station",
-    "display",
+    "display/lib",
+    "display/app",
 ]
 
-resolver="3"
+resolver = "3"

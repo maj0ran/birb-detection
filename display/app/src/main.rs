@@ -1,21 +1,13 @@
-use crate::error::Result;
-use crate::math::{UVec, Vec2};
-use crate::page::Page;
-use crate::screen::Screen;
-use crate::util::FontSetting;
-use crate::widgets::image::Image;
-use crate::widgets::text::Text;
-use crate::widgets::widget::{HAlign, Position, Positioner, VAlign};
+use bird_display_lib::error::Result;
+use bird_display_lib::math::{UVec, Vec2};
+use bird_display_lib::page::Page;
+use bird_display_lib::screen::Screen;
+use bird_display_lib::util::FontSetting;
+use bird_display_lib::widgets::image::Image;
+use bird_display_lib::widgets::text::Text;
+use bird_display_lib::widgets::widget::{HAlign, Position, Positioner, VAlign};
 use std::fs::File;
 use std::io::{self, BufRead, Read};
-
-mod error;
-mod framebuffer;
-mod math;
-mod page;
-mod screen;
-mod util;
-mod widgets;
 
 #[allow(unused)]
 const FONT_MED: FontSetting = FontSetting {
