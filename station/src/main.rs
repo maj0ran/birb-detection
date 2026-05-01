@@ -12,6 +12,7 @@ use image::EncodableLayout;
 use smol_macros::main;
 use std::io::{Read, Write};
 use std::os::unix::net::UnixStream;
+use std::process::Command;
 
 struct ClassificationEntry {
     name: String,
@@ -21,11 +22,30 @@ struct ClassificationEntry {
 main! {
     async fn main() -> Result<()> {
         env_logger::init();
-        // Init the birb socket. We are sending our microphone data into this socket.
-        // the python script on the other side will receive the data and put it
-        // into his ML voodoo. After it inferred a birb, it will send back
+
+        log::info!("Starting birb-station");
+
+        // Start the Python scripts that contains the ML models. This script also sets up
+        // the socket for communication between rust and python.
+        let _ = Command::new(".venv/bin/python3")
+        .arg("main.py")
+        .spawn()
+        .expect("failed to execute process");
+
+
+        // Connect to the birb socket. We are sending our microphone data into this socket.
+        // The socket is created by the Python script on the other side, which will receive
+        // the data and put it into its ML voodoo. After it inferred a birb, it will send back
         // the classification to us.
-        let mut socket = UnixStream::connect("/tmp/birb_socket")?;
+        // Since we started the Python script just before, we will probably fail when trying
+        // to connect immediately, so we repeat until it succeeds. This is a bit dirty, as we
+        // could block here indefinitely when something goes on fire, but let's just say
+        // this is fine.
+        let mut socket = UnixStream::connect("/tmp/birb_socket");
+        while let Err(_) = socket {
+            socket = UnixStream::connect("/tmp/birb_socket")
+        }
+        let mut socket = socket.unwrap();
 
         // Init the microphone. After this call, the microphone will collect data that
         // can be accessed from its ringbuffer via `rb_consumer`.
