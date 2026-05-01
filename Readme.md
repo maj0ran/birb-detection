@@ -1,8 +1,11 @@
-- onnxruntime is needed on the system (via apt or pip?)
+Compile
+-------
 
-- env ORT_DYLIB_PATH must point to the onnxruntime lib (/usr/lib/...)
+### Bird-Station:
+`cross build --target aarch64-unknown-linux-gnu --bin bird-station --release`
 
-- then use the Cargo.toml as given
+### Bird-Display:
+`cross build --target arm-unknown-linux-gnueabihf --bin bird-display --release`
 
 
 - In text and code files, I often use the word "birb" instead of "bird" because it is more cute and funny. Variables are most of the time bird tho to keep it at least somewhat professional.
