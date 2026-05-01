@@ -1,0 +1,6 @@
+[target.arm-unknown-linux-gnueabihf]
+dockerfile = "docker/Dockerfile.armhf"
+
+[target.aarch64-unknown-linux-gnu]
+dockerfile = "docker/Dockerfile.aarch64"
+
