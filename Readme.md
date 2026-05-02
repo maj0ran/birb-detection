@@ -16,6 +16,9 @@ Compile
 - `scripts/` contains pre-runtime utilities to gather data for displaying birb information. `birb_scraper.py` is scraping Wikipedia for all birb articles that can be found using `model_data/labels.txt`. From these articles, it will download the summary and the first section as well as the first image, if any.  
 
 
+### Run with:
+`docker run -v /run/user/1000/pipewire-0:/tmp/pipewire-0 -e XDG_RUNTIME_DIR=/tmp -t birb`
+
 Offline Encyclopedia
 --------------------
 
