@@ -7,7 +7,7 @@ import birdnet
 import numpy as np
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(format='%(asctime)s \x1b[36;1m[PYTHON]\x1b[0m %(levelname)s: %(message)s', level=logging.DEBUG)
+logging.basicConfig(format='%(asctime)s \x1b[36;1m[PYTHON]\x1b[0m %(levelname)s: %(message)s', level=logging.INFO)
 
 
 class BirdResult:

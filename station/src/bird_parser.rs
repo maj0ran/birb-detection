@@ -1,3 +1,5 @@
+use serde::Serialize;
+
 // These items are also baked in the ML model, but we exclude them because of
 // their un-birby nature.
 const EXCLUDED_ITEMS: [&str; 10] = [
@@ -13,9 +15,9 @@ const EXCLUDED_ITEMS: [&str; 10] = [
     "Gun",
 ];
 
+#[derive(Serialize)]
 pub struct BirdData {
     pub name: String,
-    pub page: String,
 }
 
 pub struct BirdParser {}
@@ -30,11 +32,8 @@ impl BirdParser {
             return None;
         }
 
-        let page = format!("encyclopedia/{}/index.html", latin_name);
-
         Some(BirdData {
             name: latin_name.into(),
-            page,
         })
     }
 }

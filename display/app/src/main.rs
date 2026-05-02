@@ -1,3 +1,6 @@
+mod receiver;
+
+use crate::receiver::{BirdData, Receiver};
 use bird_display_lib::error::Result;
 use bird_display_lib::math::{UVec, Vec2};
 use bird_display_lib::page::Page;
@@ -6,8 +9,10 @@ use bird_display_lib::util::FontSetting;
 use bird_display_lib::widgets::image::Image;
 use bird_display_lib::widgets::text::Text;
 use bird_display_lib::widgets::widget::{HAlign, Position, Positioner, VAlign};
+use smol_macros::main;
 use std::fs::File;
 use std::io::{self, BufRead, Read};
+use std::path::Path;
 
 #[allow(unused)]
 const FONT_MED: FontSetting = FontSetting {
@@ -32,20 +37,25 @@ const FONT_SMALL: FontSetting = FontSetting {
 
 const UPPER_BORDER: u16 = 150;
 
-pub fn main() -> Result<()> {
-    let screen = Screen::new()?;
+async fn render_bird(screen: &Screen, bird_data: BirdData) -> Result<()> {
+    println!("Rendering bird: {}", bird_data.name);
 
-    println!("Screen Dimension: {}x{}", screen.width, screen.height);
+    // The page path is like "encyclopedia/{latin_name}/index.html"
+    // We expect "desc.txt" and "bird.jpg" to be in the same directory as index.html
+    let desc_path = format!("/mnt/onboard/encyclopedia/{}/desc.txt", bird_data.name);
+    let image_path = format!("/mnt/onboard/encyclopedia/{}/image.jpg", bird_data.name);
 
     let mut page = Page::new_with_screen_dim(&screen);
 
     let image = Image::new(
-        "bird.jpg",
+        &image_path,
         1.0,
         Position::Absolute(UVec::new(screen.width - 600 - 20, UPPER_BORDER)),
     );
 
-    let f = File::open("desc.txt").unwrap();
+    let f = File::open(desc_path).map_err(|e| {
+        bird_display_lib::error::EInkError::Generic(format!("Failed to open desc.txt: {}", e))
+    })?;
     let mut reader = io::BufReader::new(f);
 
     let mut latin_name = String::new();
@@ -58,9 +68,9 @@ pub fn main() -> Result<()> {
     let _ = reader.read_to_string(&mut desc);
 
     // strip trailing '\n'
-    latin_name = latin_name[..latin_name.len() - 1].to_owned();
-    common_name = common_name[..common_name.len() - 1].to_owned();
-    desc = desc[..desc.len() - 1].to_owned();
+    latin_name = latin_name.trim_end().to_owned();
+    common_name = common_name.trim_end().to_owned();
+    desc = desc.trim_end().to_owned();
 
     let latin_name_item = Text::new(
         &latin_name,
@@ -88,8 +98,6 @@ pub fn main() -> Result<()> {
         Vec2::new(1300, 900),
     );
 
-    println!("text w: {} h: {}", desc_item.width, desc_item.height);
-
     page.add(image);
     page.add(latin_name_item);
     page.add(common_name_item);
@@ -102,4 +110,22 @@ pub fn main() -> Result<()> {
     screen.update();
 
     Ok(())
+}
+
+main! {
+    async fn main() -> Result<()> {
+        env_logger::init();
+        let screen = Screen::new()?;
+
+        println!("Screen Dimension: {}x{}", screen.width, screen.height);
+
+        let receiver = Receiver::new("192.168.178.52:8128");
+        receiver.run(|data| {
+            if let Err(e) = smol::block_on(render_bird(&screen, data)) {
+                log::error!("Error rendering bird: {}", e);
+            }
+        }).await?;
+
+        Ok(())
+    }
 }

@@ -6,6 +6,8 @@ pub enum EInkError {
     Init(#[from] std::io::Error),
     #[error("Plot error")]
     Plot(),
+    #[error("Generic error: {0}")]
+    Generic(String),
 }
 
 pub type Result<T> = std::result::Result<T, EInkError>;
