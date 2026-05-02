@@ -28,7 +28,7 @@ main! {
         // Start the Python scripts that contains the ML models. This script also sets up
         // the socket for communication between rust and python.
         let _ = Command::new(".venv/bin/python3")
-        .arg("main.py")
+        .arg("classifier.py")
         .spawn()
         .expect("failed to execute process");
 

@@ -72,7 +72,7 @@ while True:
     result = predictions.to_structured_array()
     result = result.view(np.recarray)
     # print if result is not empty (got a birb).
-    if len(result) is not 0:
+    if len(result) != 0:
         logger.debug("birb: %s | confidence: %s", result.species_name, result.confidence)
 
     # Encapsulate into our birb datatype
