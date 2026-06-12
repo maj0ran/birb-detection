@@ -1,6 +1,25 @@
-use axum::{routing::get, Json, Router};
+use axum::{http::StatusCode, routing::get, Json, Router};
+use std::fs;
+use std::path::PathBuf;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 use tower_http::services::ServeDir;
-use trmnl::{DeviceInfo, DisplayResponse, LogEntry, LogResponse, SetupResponse};
+use trmnl::{
+    render_html_to_png, DeviceInfo, DisplayResponse, LogEntry, LogResponse, RenderConfig,
+    SetupResponse,
+};
+
+/// Application state
+struct AppState {
+    /// Base URL for images
+    base_url: String,
+    /// Directory to store images
+    image_dir: PathBuf,
+    /// Last generated filename
+    last_filename: RwLock<Option<String>>,
+    /// Render configuration
+    render_config: RenderConfig,
+}
 
 /// GET /api/setup - Device registration
 async fn setup(device: DeviceInfo) -> Json<SetupResponse> {
@@ -79,4 +98,40 @@ pub async fn run() {
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     axum::serve(listener, app).await.unwrap();
+}
+
+pub async fn generate_image() -> Result<(), (StatusCode, String)> {
+    let state = Arc::new(AppState {
+        base_url: "http://localhost:3000".to_string(),
+        image_dir: PathBuf::from("/tmp/trmnl-images"),
+        last_filename: RwLock::new(None),
+        render_config: RenderConfig::default(),
+    });
+
+    let html = fs::read_to_string("encyclopedia/Turdus merula/index.html")
+        .unwrap_or(("Failed to read HTML file".to_string()));
+
+    // Render to PNG
+    let png_data = render_html_to_png(&html, &state.render_config)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    // Save to file
+    let filename = "foo.png".to_string();
+    let image_path = state.image_dir.join(&filename);
+
+    tokio::fs::create_dir_all(&state.image_dir)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    tokio::fs::write(&image_path, &png_data)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    // Update last filename
+    *state.last_filename.write().await = Some(filename.clone());
+
+    let image_url = format!("{}/images/{}", state.base_url, filename);
+
+    Ok(())
 }

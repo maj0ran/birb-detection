@@ -1,22 +1,22 @@
-use smol::channel::{unbounded, Receiver};
-use smol::io::AsyncWriteExt;
-use smol::lock::Mutex;
-use smol::net::{TcpListener, TcpStream};
 use std::sync::Arc;
+use tokio::io::AsyncWriteExt;
+use tokio::net::{TcpListener, TcpStream};
+use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
+use tokio::sync::Mutex;
 
 use crate::bird_parser::BirdData;
 use crate::error::Result;
 
 pub struct Transmitter {
     clients: Arc<Mutex<Vec<TcpStream>>>,
-    rx: Receiver<BirdData>,
+    rx: UnboundedReceiver<BirdData>,
 }
 
 const PORT: u16 = 8128;
 
 impl Transmitter {
-    pub fn new() -> (Self, smol::channel::Sender<BirdData>) {
-        let (tx, rx) = unbounded();
+    pub fn new() -> (Self, UnboundedSender<BirdData>) {
+        let (tx, rx) = unbounded_channel();
         (
             Self {
                 clients: Arc::new(Mutex::new(Vec::new())),
@@ -26,7 +26,7 @@ impl Transmitter {
         )
     }
 
-    pub async fn run(self) -> Result<()> {
+    pub async fn run(mut self) -> Result<()> {
         log::info!("start listening on port {}.", PORT);
 
         let listener = TcpListener::bind(format!("0.0.0.0:{}", PORT)).await?;
@@ -34,7 +34,7 @@ impl Transmitter {
         // Spawn a task to accept incoming connections.
         // This task needs access to the clients-vector, so we give it its own mutex'd handle.
         let clients_accept = self.clients.clone();
-        smol::spawn(async move {
+        tokio::spawn(async move {
             loop {
                 match listener.accept().await {
                     Ok((socket, addr)) => {
@@ -47,16 +47,14 @@ impl Transmitter {
                     }
                 }
             }
-        })
-        .detach();
+        });
 
         // Main loop to broadcast data received from the channel
         loop {
-            let bird_data = self
-                .rx
-                .recv()
-                .await
-                .map_err(|_| crate::error::BirdError::Generic("Channel closed".to_string()))?;
+            let bird_data =
+                self.rx.recv().await.ok_or_else(|| {
+                    crate::error::BirdError::Generic("Channel closed".to_string())
+                })?;
 
             let payload = serde_json::to_vec(&bird_data).map_err(|e| {
                 crate::error::BirdError::Generic(format!("Serialization error: {}", e))

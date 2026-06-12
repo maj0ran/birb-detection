@@ -13,7 +13,6 @@ use crate::transmitter::Transmitter;
 use byteorder::{LittleEndian, ReadBytesExt};
 use clap::Parser;
 use image::EncodableLayout;
-use smol_macros::main;
 use std::io::{Read, Write};
 use std::os::unix::net::UnixStream;
 use std::process::Command;
@@ -31,7 +30,7 @@ struct Args {
     ip: String,
 }
 
-main! {
+#[tokio::main]
 async fn main() -> Result<()> {
     env_logger::init();
 
@@ -40,10 +39,9 @@ async fn main() -> Result<()> {
     // Start the Python scripts that contains the ML models. This script also sets up
     // the socket for communication between rust and python.
     let _ = Command::new(".venv/bin/python3")
-    .arg("classifier.py")
-    .spawn()
-    .expect("failed to execute process");
-
+        .arg("classifier.py")
+        .spawn()
+        .expect("failed to execute process");
 
     // Connect to the birb socket. We are sending our microphone data into this socket.
     // The socket is created by the Python script on the other side, which will receive
@@ -72,59 +70,62 @@ async fn main() -> Result<()> {
     // broadcast the information to all connected clients.
     // `tx` is the channel that we use to send the birbsies to the transmitter.
     let (transmitter, tx) = Transmitter::new();
-    smol::spawn(async move {
+    tokio::spawn(async move {
         if let Err(e) = transmitter.run().await {
             log::error!("Transmitter error: {}", e);
         }
-    }).detach();
+    });
 
     tokio::spawn(async move {
         crate::trmnl::run().await;
     });
 
-        loop {
-            // collect an audio snippet from the mic and send it to the python ML code
-            let sample = collector.collect(&mut mic.rb_consumer);
-            socket.write_all(&sample.as_bytes())?;
-            // then read back from the socket. We don't need any async shizzle here,
-            // because for one audio snippet, we get one answer.
+    loop {
+        // collect an audio snippet from the mic and send it to the python ML code
+        let sample = collector.collect(&mut mic.rb_consumer);
+        socket.write_all(&sample.as_bytes())?;
+        // then read back from the socket. We don't need any async shizzle here,
+        // because for one audio snippet, we get one answer.
 
-            // first we read the number of predictions that the ML model made
-            // (we may get something like 60% Bird A, 30% Bird B, 10% Bird C)
-            let num_items = socket.read_u32::<LittleEndian>()?;
+        // first we read the number of predictions that the ML model made
+        // (we may get something like 60% Bird A, 30% Bird B, 10% Bird C)
+        let num_items = socket.read_u32::<LittleEndian>()?;
 
-            // then we read each prediction. Because birb-names happen to be of
-            // variable length, our protocol is defined to first send the length
-            // of the birb name, then the name itself, and finally the confidence value.
-            let mut predictions = Vec::new();
-            for _ in 0..num_items {
-                let name_len = socket.read_u32::<LittleEndian>()? as usize;
-                let mut name_buf = vec![0u8; name_len];
-                socket.read_exact(&mut name_buf)?;
-                let name = String::from_utf8_lossy(&name_buf).into();
-                let confidence = socket.read_f32::<LittleEndian>()?;
+        // then we read each prediction. Because birb-names happen to be of
+        // variable length, our protocol is defined to first send the length
+        // of the birb name, then the name itself, and finally the confidence value.
+        let mut predictions = Vec::new();
+        for _ in 0..num_items {
+            let name_len = socket.read_u32::<LittleEndian>()? as usize;
+            let mut name_buf = vec![0u8; name_len];
+            socket.read_exact(&mut name_buf)?;
+            let name = String::from_utf8_lossy(&name_buf).into();
+            let confidence = socket.read_f32::<LittleEndian>()?;
 
-                // A ClassificationEntry also holds the confidence value.
-                // We are just undecided yet if we want to use this or not, so we
-                // havew ClassificationEntry and BirdData for now.
-                let prediction = ClassificationEntry { name, confidence };
-                predictions.push(prediction);
-            }
+            // A ClassificationEntry also holds the confidence value.
+            // We are just undecided yet if we want to use this or not, so we
+            // havew ClassificationEntry and BirdData for now.
+            let prediction = ClassificationEntry { name, confidence };
+            predictions.push(prediction);
+        }
 
-            // We are now only interested in the top prediction. Send it to the clients
-            // when we are confident enough about the birb.
-            if !predictions.is_empty() && predictions[0].confidence > 0.3 {
-                let bird = BirdParser::create_bird_data(&predictions[0].name);
-                match bird {
-                    Some(bird) => {
-                        log::info!("Detected bird: {}. (Confidence: {})", bird.name, predictions[0].confidence);
-                        let _ = tx.send(bird).await;
-                    },
-                    None => {}
-
+        // We are now only interested in the top prediction. Send it to the clients
+        // when we are confident enough about the birb.
+        if !predictions.is_empty() && predictions[0].confidence > 0.3 {
+            let bird = BirdParser::create_bird_data(&predictions[0].name);
+            match bird {
+                Some(bird) => {
+                    log::info!(
+                        "Detected bird: {}. (Confidence: {})",
+                        bird.name,
+                        predictions[0].confidence
+                    );
+                    let _ = tx.send(bird);
                 }
+                None => {}
             }
         }
+    }
 
-        }
+    Ok(())
 }
