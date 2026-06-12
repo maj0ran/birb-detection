@@ -3,6 +3,7 @@ mod bird_parser;
 mod error;
 mod microphone;
 mod transmitter;
+mod trmnl;
 
 use crate::audio_processor::{AudioCollector, SNIPPET_SAMPLES};
 use crate::bird_parser::BirdParser;
@@ -10,6 +11,7 @@ use crate::error::Result;
 use crate::microphone::BirdMicrophone;
 use crate::transmitter::Transmitter;
 use byteorder::{LittleEndian, ReadBytesExt};
+use clap::Parser;
 use image::EncodableLayout;
 use smol_macros::main;
 use std::io::{Read, Write};
@@ -19,6 +21,14 @@ use std::process::Command;
 struct ClassificationEntry {
     name: String,
     confidence: f32,
+}
+
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    /// ip address of the birb-server
+    #[arg(long)]
+    ip: String,
 }
 
 main! {
@@ -67,6 +77,10 @@ async fn main() -> Result<()> {
             log::error!("Transmitter error: {}", e);
         }
     }).detach();
+
+    tokio::spawn(async move {
+        crate::trmnl::run().await;
+    });
 
         loop {
             // collect an audio snippet from the mic and send it to the python ML code
