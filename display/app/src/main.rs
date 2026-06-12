@@ -9,10 +9,19 @@ use bird_display_lib::util::FontSetting;
 use bird_display_lib::widgets::image::Image;
 use bird_display_lib::widgets::text::Text;
 use bird_display_lib::widgets::widget::{HAlign, Position, Positioner, VAlign};
+use clap::Parser;
 use smol_macros::main;
 use std::fs::File;
 use std::io::{self, BufRead, Read};
 use std::path::Path;
+
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    /// ip address of the birb-server
+    #[arg(long)]
+    ip: String,
+}
 
 #[allow(unused)]
 const FONT_MED: FontSetting = FontSetting {
@@ -37,11 +46,31 @@ const FONT_SMALL: FontSetting = FontSetting {
 
 const UPPER_BORDER: u16 = 150;
 
+main! {
+    async fn main() -> Result<()> {
+        env_logger::init();
+        let args = Args::parse();
+        let ip = args.ip;
+
+        let screen = Screen::new()?;
+
+        println!("Screen Dimension: {}x{}", screen.width, screen.height);
+
+        let receiver = Receiver::new(&ip);
+        receiver.run(|data| {
+            if let Err(e) = smol::block_on(render_bird(&screen, data)) {
+                log::error!("Error rendering bird: {}", e);
+            }
+        }).await?;
+
+        Ok(())
+    }
+}
+
 async fn render_bird(screen: &Screen, bird_data: BirdData) -> Result<()> {
     println!("Rendering bird: {}", bird_data.name);
 
-    // The page path is like "encyclopedia/{latin_name}/index.html"
-    // We expect "desc.txt" and "bird.jpg" to be in the same directory as index.html
+    // The page path is "encyclopedia/{latin_name}/"
     let desc_path = format!("/mnt/onboard/encyclopedia/{}/desc.txt", bird_data.name);
     let image_path = format!("/mnt/onboard/encyclopedia/{}/image.jpg", bird_data.name);
 
@@ -110,22 +139,4 @@ async fn render_bird(screen: &Screen, bird_data: BirdData) -> Result<()> {
     screen.update();
 
     Ok(())
-}
-
-main! {
-    async fn main() -> Result<()> {
-        env_logger::init();
-        let screen = Screen::new()?;
-
-        println!("Screen Dimension: {}x{}", screen.width, screen.height);
-
-        let receiver = Receiver::new("192.168.178.52:8128");
-        receiver.run(|data| {
-            if let Err(e) = smol::block_on(render_bird(&screen, data)) {
-                log::error!("Error rendering bird: {}", e);
-            }
-        }).await?;
-
-        Ok(())
-    }
 }
