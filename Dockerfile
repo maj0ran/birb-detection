@@ -3,7 +3,7 @@ FROM python:3.13-slim-trixie
 # Install system dependencies
 # Those are needed for the audio/microphone stuff
 RUN apt-get update && apt-get install -y \
-    libasound2 \
+    libasound2-dev \
     alsa-utils \
     pipewire pipewire-alsa \
     && rm -rf /var/lib/apt/lists/*

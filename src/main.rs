@@ -36,9 +36,12 @@ async fn main() -> Result<()> {
 
     log::info!("Starting birb-station");
 
+    // Init the microphone. After this call, the microphone will collect data that
+    // can be accessed from its ringbuffer via `rb_consumer`.
+    let mut mic = BirdMicrophone::new()?;
     // Start the Python scripts that contains the ML models. This script also sets up
     // the socket for communication between rust and python.
-    let _ = Command::new(".venv/bin/python3")
+    let _ = Command::new("python3")
         .arg("classifier.py")
         .spawn()
         .expect("failed to execute process");
@@ -56,10 +59,6 @@ async fn main() -> Result<()> {
         socket = UnixStream::connect("/tmp/birb_socket")
     }
     let mut socket = socket.unwrap();
-
-    // Init the microphone. After this call, the microphone will collect data that
-    // can be accessed from its ringbuffer via `rb_consumer`.
-    let mut mic = BirdMicrophone::new()?;
 
     // Init the `AudioCollector`. This one collects the data from the microphone
     // and merges it into snippets of SNIPPET_SAMPLES size (=sample_rate * length)

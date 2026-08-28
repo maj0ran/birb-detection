@@ -1,3 +1,13 @@
+Prerequisites
+-------------
+
+
+
+- Install cargo via rustup
+
+- Install cargo cross compilation tools:
+`cargo install cargo-cross`
+
 Compile
 -------
 
