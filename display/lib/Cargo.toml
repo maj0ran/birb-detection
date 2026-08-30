@@ -1,0 +1,10 @@
+[package]
+name = "bird-display-lib"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+image = "0.25.10"
+libc = "0.2.186"
+rusttype = "0.9.3"
+thiserror = "2.0.18"
