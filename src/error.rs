@@ -19,6 +19,9 @@ pub enum BirdError {
 
     #[error("Generic error: {0}")]
     Generic(String),
+
+    #[error("ONNX Error")]
+    ONNXError(#[from] birdnet_onnx::Error),
 }
 
 pub type Result<T> = std::result::Result<T, BirdError>;
