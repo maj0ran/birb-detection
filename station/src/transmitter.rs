@@ -3,8 +3,7 @@ use tokio::io::AsyncWriteExt;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use tokio::sync::Mutex;
-
-use crate::bird_parser::BirdData;
+use crate::bird_detection::BirdData;
 use crate::error::Result;
 
 pub struct Transmitter {

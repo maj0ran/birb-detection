@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io;
 use std::io::{BufRead, Read};
+use serde::{Deserialize, Serialize};
 
 // These items are also baked in the ML model, but we exclude them because of
 // their un-birby nature.
@@ -21,12 +22,9 @@ const EXCLUDED_ITEMS: [&str; 10] = [
     "Gun",
 ];
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct BirdData {
     pub name: String,
-    pub translation: String,
-    pub desc: Option<String>,
-    pub image: Option<DynamicImage>,
 }
 
 pub struct BirdClassifier {
@@ -95,36 +93,24 @@ impl BirdClassifier {
                 return None;
             }
 
-            Some(self.create_bird_data(&pred.species))
-        } else {
-            None
+            return self.create_bird_data(&pred.species);
         }
+
+        None
     }
 
-    fn create_bird_data(&self, name: &str) -> BirdData {
-        let desc_file = File::open(format!("encyclopedia/{}/description.txt", name));
-        let img_file_path = format!("encyclopedia/{}/image.jpg", name);
 
-        let image = ImageReader::open(img_file_path)
-            .ok()
-            .and_then(|reader| reader.decode().ok());
+    pub fn create_bird_data(&self, name: &str) -> Option<BirdData> {
+        // the ML model is designed to output birb names as {latin}_{english-common}.
+        // we only want the latin name as these are the names in our encyclopedia.
+        let latin_name = name.split("_").next().unwrap();
 
-        let translation = self
-            .translations
-            .get(name)
-            .cloned()
-            .unwrap_or(name.to_string());
-
-        let desc = desc_file.ok().and_then(|mut f| {
-            let mut text_buf = String::new();
-            f.read_to_string(&mut text_buf).ok().map(|_| text_buf)
-        });
-
-        BirdData {
-            name: name.to_string(),
-            translation,
-            desc,
-            image,
+        if EXCLUDED_ITEMS.contains(&latin_name) {
+            return None;
         }
+
+        Some(BirdData {
+            name: latin_name.into(),
+        })
     }
 }

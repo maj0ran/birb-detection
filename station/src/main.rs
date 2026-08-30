@@ -1,5 +1,4 @@
 mod audio_processor;
-mod bird_parser;
 mod error;
 mod microphone;
 mod transmitter;
@@ -7,7 +6,6 @@ mod trmnl;
 mod bird_detection;
 
 use crate::audio_processor::{AudioCollector, SNIPPET_SAMPLES};
-use crate::bird_parser::BirdParser;
 use crate::error::Result;
 use crate::microphone::BirdMicrophone;
 use crate::transmitter::Transmitter;
@@ -69,6 +67,10 @@ async fn main() -> Result<()> {
         let pred = classifier.predict(&sample);
         log::info!("Predictions: {:?}", pred);
 
+        match pred {
+            Some(pred) => tx.send(pred).unwrap(),
+            None => (),
+        }
     }
 
     Ok(())
