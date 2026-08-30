@@ -165,8 +165,8 @@ impl Framebuffer {
  ** it to correctly talk with the driver and fill all the fields we get from the kernel.
  **/
 
-const FBIOGET_VSCREENINFO: libc::c_ulong = 0x4600;
-const FBIOGET_FSCREENINFO: libc::c_ulong = 0x4602;
+const FBIOGET_VSCREENINFO: libc::Ioctl = 0x4600;
+const FBIOGET_FSCREENINFO: libc::Ioctl = 0x4602;
 
 ///
 /// All waveform modes for documentation even though we don't use them.
@@ -199,8 +199,8 @@ const EPDC_FLAG_FORCE_MONOCHROME: libc::c_uint = 0x02;
 // usually you find the IDs 0x2E and 0x2F for these ioctls but here we have some custom version of
 // these?
 // Someone on the internet reverse engineered this, I just stole it
-const MXCFB_SEND_UPDATE: libc::c_ulong = 0x4044462E;
-const MXCFB_WAIT_FOR_UPDATE_COMPLETE: libc::c_ulong = 0x4004462F;
+const MXCFB_SEND_UPDATE: libc::Ioctl = 0x4044462E;
+const MXCFB_WAIT_FOR_UPDATE_COMPLETE: libc::Ioctl = 0x4004462F;
 
 #[allow(unused)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
