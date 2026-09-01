@@ -1,4 +1,4 @@
-use crate::bird_detection::BirdData;
+use crate::bird_detection::BirdName;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -22,10 +22,10 @@ pub enum BirdError {
     Generic(String),
 
     #[error("ONNX Error")]
-    ONNXError(#[from] birdnet_onnx::Error),
+    ONNX(#[from] birdnet_onnx::Error),
 
     #[error("Network error: {0}")]
-    NetworkError(#[from] tokio::sync::mpsc::error::SendError<BirdData>),
+    Network(#[from] tokio::sync::mpsc::error::SendError<BirdName>),
 }
 
 pub type Result<T> = std::result::Result<T, BirdError>;

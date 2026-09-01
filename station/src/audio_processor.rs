@@ -1,25 +1,16 @@
-use crate::microphone::SAMPLE_RATE;
 use ringbuf::traits::*;
-
-pub const SNIPPET_DURATION_SECS: usize = 3;
-pub const SNIPPET_SAMPLES: usize = SAMPLE_RATE as usize * SNIPPET_DURATION_SECS;
 
 type AudioSnippet = Vec<f32>;
 
-pub struct AudioCollector {
-    target_size: usize,
-}
+pub struct AudioCollector;
 
 impl AudioCollector {
-    pub fn new(target_size: usize) -> Self {
-        Self { target_size }
-    }
     /// Pulls samples from the consumer until an `AudioSnippet` of target size has been fully collected.
     /// Then returns the `AudioSnippet`.
-    pub fn collect<C: Consumer<Item = f32>>(&mut self, consumer: &mut C) -> AudioSnippet {
-        let mut buffer = Vec::with_capacity(self.target_size);
+    pub fn collect<C: Consumer<Item = f32>>(consumer: &mut C, target_size: usize) -> AudioSnippet {
+        let mut buffer = Vec::with_capacity(target_size);
         loop {
-            let remaining = self.target_size - buffer.len();
+            let remaining = target_size - buffer.len();
             let available = consumer.occupied_len();
             let to_read = available.min(remaining);
 
@@ -32,8 +23,8 @@ impl AudioCollector {
                     buffer.truncate(start_idx + actual_read);
                 }
             }
-
-            if buffer.len() >= self.target_size {
+            // audio snippet complete, return data
+            if buffer.len() >= target_size {
                 log::debug!("Collected {} samples, returning snippet", buffer.len());
                 return buffer;
             }

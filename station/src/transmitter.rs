@@ -1,4 +1,4 @@
-use crate::bird_detection::BirdData;
+use crate::bird_detection::BirdName;
 use crate::error::Result;
 use std::sync::Arc;
 use tokio::io::AsyncWriteExt;
@@ -7,14 +7,14 @@ use tokio::sync::Mutex;
 use tokio::sync::mpsc::{UnboundedSender, unbounded_channel};
 
 pub struct Transmitter {
-    tx: UnboundedSender<BirdData>,
+    tx: UnboundedSender<BirdName>,
 }
 
 const PORT: u16 = 8128;
 
 impl Transmitter {
     pub async fn new() -> Result<Self> {
-        let (tx, rx) = unbounded_channel::<BirdData>();
+        let (tx, rx) = unbounded_channel::<BirdName>();
         let clients = Arc::new(Mutex::new(Vec::new()));
 
         log::info!("start listening on port {}.", PORT);
@@ -42,7 +42,7 @@ impl Transmitter {
             // Main loop to broadcast data received from the channel
             let mut rx = rx;
             while let Some(bird_data) = rx.recv().await {
-                let name = bird_data.name.as_bytes();
+                let name = bird_data.as_bytes();
                 let length = match u32::try_from(name.len()) {
                     Ok(length) => length,
                     Err(_) => {
@@ -78,7 +78,7 @@ impl Transmitter {
         Ok(Self { tx })
     }
 
-    pub fn send(&self, data: BirdData) -> Result<()> {
+    pub fn send(&self, data: BirdName) -> Result<()> {
         self.tx.send(data)?;
         Ok(())
     }
