@@ -1,19 +1,19 @@
 use crate::error::{BirdError, Result};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{
-    default_host, BufferSize, FrameCount, InputCallbackInfo, Stream, StreamConfig,
-    SupportedBufferSize,
+    BufferSize, FrameCount, InputCallbackInfo, Stream, StreamConfig, SupportedBufferSize,
+    default_host,
 };
-use ringbuf::{traits::*, HeapRb};
+use ringbuf::{HeapRb, traits::*};
 
-// our Birb classifier expects audio of this sample rate to correctly inference birb sounds.
+// Microphone sample rate.
+// Our Birb classifier expects audio of this sample rate to correctly inference birb sounds.
 pub const SAMPLE_RATE: u32 = 48000;
-// the immediate buffer for the microphone. The callback for the microphone stream needs
-// a buffer where it places its samples. This is different to the ring buffer, which we use to safely
-// send the data out of the microphone thread. This COULD be better in theory where we'd only use
-// one buffer, but I'm not sure if the CPAL API gives us that option.
+// size for the internal CPAL microphone buffer. This is required by the CPAL API and used for
+// immediate microphone data capture. This is different to the ring buffer, which we use to safely
+// send the data out of the microphone thread.
 const AUDIO_BUFFER_SIZE: usize = 512;
-// we want 3-second-snippets of audio but make the ring buffer twice as large for good measure
+// we want 3-second-snippets of audio, but let's make the ring buffer twice as large for good measure.
 const RING_BUFFER_SIZE: usize = SAMPLE_RATE as usize * 3 * 2;
 
 /// The `BirdMicrophone` is responsible for capturing audio from the microphone and storing it
@@ -71,9 +71,8 @@ impl BirdMicrophone {
         let (mut producer, consumer) = rb.split();
 
         // Initializes a thread that will periodically read from the microphone.
-        // The `data_callback` is called every time the `data` buffer with the given size is filled.
-        // (This functionality is CPAL foo, so we have to work with it this way.)
-        // We will then push this data into our ringbuffer where it will be accessible from the outside.
+        // The `data_callback` is CPAL API and is called every time the `data` buffer with the given size is filled.
+        // Using this callback, we will push the mic data into our ringbuffer where it will be accessible from the outside.
         let _stream = input.build_input_stream(
             &config,
             move |data: &[f32], _: &InputCallbackInfo| {
@@ -88,7 +87,7 @@ impl BirdMicrophone {
         // while other systems play without it.
         _stream.play()?;
 
-        log::info!("Microphone initialized");
+        log::info!("--- Microphone initialized ---");
 
         Ok(BirdMicrophone {
             rb_consumer: consumer,

@@ -5,7 +5,6 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io;
 use std::io::{BufRead, Read};
-use serde::{Deserialize, Serialize};
 
 // These items are also baked in the ML model, but we exclude them because of
 // their un-birby nature.
@@ -22,7 +21,7 @@ const EXCLUDED_ITEMS: [&str; 10] = [
     "Gun",
 ];
 
-#[derive(Debug, Serialize)]
+#[derive(Debug)]
 pub struct BirdData {
     pub name: String,
 }
@@ -98,8 +97,6 @@ impl BirdClassifier {
 
         None
     }
-
-
     pub fn create_bird_data(&self, name: &str) -> Option<BirdData> {
         // the ML model is designed to output birb names as {latin}_{english-common}.
         // we only want the latin name as these are the names in our encyclopedia.

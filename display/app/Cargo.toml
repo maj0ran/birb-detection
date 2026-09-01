@@ -7,9 +7,6 @@ edition = "2024"
 bird-display-lib = { path = "../lib" }
 smol = "2.0.2"
 smol-macros = "0.1.1"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
 log = "0.4.29"
 env_logger = "0.11.10"
 clap = { version = "4.6.0", features = ["derive"] }
-

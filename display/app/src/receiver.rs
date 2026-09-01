@@ -1,9 +1,8 @@
 use bird_display_lib::error::{EInkError, Result};
-use serde::Deserialize;
-use smol::io::{AsyncBufReadExt, BufReader};
+use smol::io::{AsyncReadExt, BufReader};
 use smol::net::TcpStream;
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Clone)]
 pub struct BirdData {
     pub name: String,
 }
@@ -35,21 +34,24 @@ impl Receiver {
                 Ok(stream) => {
                     log::info!("Connected to {}", self.addr);
                     let mut reader = BufReader::new(stream);
-                    let mut line = String::new();
                     loop {
-                        line.clear();
-                        match reader.read_line(&mut line).await {
-                            Ok(0) => {
-                                log::warn!("Connection closed by server");
-                                break;
-                            }
-                            Ok(_) => match serde_json::from_str::<BirdData>(&line) {
-                                Ok(data) => on_data(data),
-                                Err(e) => log::error!("Failed to deserialize BirdData: {}", e),
-                            },
+                        let mut length_bytes = [0u8; 4];
+                        if let Err(e) = reader.read_exact(&mut length_bytes).await {
+                            log::warn!("Failed to read bird name length: {}", e);
+                            break;
+                        }
+
+                        let length = u32::from_be_bytes(length_bytes) as usize;
+                        let mut name_bytes = vec![0u8; length];
+                        if let Err(e) = reader.read_exact(&mut name_bytes).await {
+                            log::warn!("Failed to read bird name: {}", e);
+                            break;
+                        }
+
+                        match String::from_utf8(name_bytes) {
+                            Ok(name) => on_data(BirdData { name }),
                             Err(e) => {
-                                log::error!("Error reading from stream: {}", e);
-                                break;
+                                log::error!("Invalid UTF-8 in bird name: {}", e);
                             }
                         }
                     }
